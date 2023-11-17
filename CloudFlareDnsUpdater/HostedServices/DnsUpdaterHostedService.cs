@@ -82,14 +82,14 @@ internal partial class DnsUpdaterHostedService : IHostedService
                     // skip records that do not end with the domain we want to limit to if limiter is set
                     if (!string.IsNullOrWhiteSpace(_limitToZoneByDomain) && !record.Name.EndsWith(_limitToZoneByDomain))
                     {
-                        _logger.Debug("Skipping record '{@Record}' because it does not end with '{LimitToZoneByDomain}'", record, _limitToZoneByDomain);
+                        _logger.Debug("Skipping record '{Record}' because it does not end with '{LimitToZoneByDomain}'", record.Name, _limitToZoneByDomain);
 
                         continue;
                     }
 
                     if (record.Type is not DnsRecordType.A || record.Content == externalIpAddress.ToString())
                     {
-                        _logger.Debug("The IP for record '{@Record}' in zone '{@Zone}' is already '{@ExternalIpAddress}'", record, zone, externalIpAddress);
+                        _logger.Debug("The IP for record '{Record}' in zone '{Zone}' is already '{ExternalIpAddress}'", record.Name, zone.Name, externalIpAddress.ToString());
 
                         continue;
                     }
@@ -105,7 +105,7 @@ internal partial class DnsUpdaterHostedService : IHostedService
 
                     if (updateResult.Success)
                     {
-                        _logger.Information("Successfully updated record '{@Record}' ip to '{ExternalIpAddress}' in zone '{Zone}'", record, externalIpAddress.ToString(), zone.Name);
+                        _logger.Information("Successfully updated record '{Record}' ip from '{PreviousIp}' to '{ExternalIpAddress}' in zone '{Zone}'", record.Name, record.Content, externalIpAddress.ToString(), zone.Name);
 
                         continue;
                     }
