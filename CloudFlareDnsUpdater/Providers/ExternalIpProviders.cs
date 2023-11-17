@@ -1,20 +1,17 @@
-﻿using System.Collections.Generic;
+﻿namespace CloudFlareDnsUpdater.Providers;
 
-namespace CloudFlareDnsUpdater.Providers
+public static class ExternalIpProviders
 {
-    public static class ExternalIpProviders
-    {
-        public static IEnumerable<string> Providers { get; }
+    public static IEnumerable<string> Providers { get; }
 
-        static ExternalIpProviders()
+    static ExternalIpProviders()
+    {
+        Providers = new List<string>
         {
-            Providers = new List<string>
-            {
-                "https://ipecho.net/plain",
-                "https://icanhazip.com/",
-                "https://whatismyip.akamai.com",
-                "https://tnx.nl/ip"
-            };
-        }
+            "https://ipecho.net/plain",
+            "https://icanhazip.com/",
+            "https://whatismyip.akamai.com",
+            "https://tnx.nl/ip"
+        };
     }
 }
