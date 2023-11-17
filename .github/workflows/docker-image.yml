@@ -20,6 +20,6 @@ jobs:
         image: ghcr.io/trossr32/cloudflare-dns-updater
         tag: latest
         registry: ghcr.io
-        dockerfile: CloudFlareDnsUpdaterDockerfile
+        dockerfile: CloudFlareDnsUpdater/Dockerfile
         username: trossr32
         password: ${{ secrets.REPOSNAPSHOT_API_KEY }}
