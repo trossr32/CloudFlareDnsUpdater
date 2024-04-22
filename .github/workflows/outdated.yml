@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  SOLUTION_PATH: 'src/RobGreenEngineering.sln'
+  SOLUTION_PATH: 'CloudFlareDnsUpdater.sln'
   EXCLUDE_PACKAGES: 'Microsoft.VisualStudio.Azure.Containers.Tools.Targets'
 
 jobs:
