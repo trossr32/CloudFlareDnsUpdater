@@ -1,17 +1,15 @@
 name: Build docker image
-
 on:
   push:
     branches: [ master ]
+  
+  workflow_dispatch:
 
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2.3.2
+    - uses: actions/checkout@v4
       name: Check out code
 
     - uses: mr-smithers-excellent/docker-build-push@v4
