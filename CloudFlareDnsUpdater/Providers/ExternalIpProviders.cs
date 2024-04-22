@@ -6,12 +6,12 @@ public static class ExternalIpProviders
 
     static ExternalIpProviders()
     {
-        Providers = new List<string>
-        {
+        Providers =
+        [
             "https://ipecho.net/plain",
             "https://icanhazip.com/",
             "https://whatismyip.akamai.com",
             "https://tnx.nl/ip"
-        };
+        ];
     }
 }
