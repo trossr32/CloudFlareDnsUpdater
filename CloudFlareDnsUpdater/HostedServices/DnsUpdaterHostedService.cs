@@ -1,5 +1,6 @@
 ﻿using CloudFlare.Client;
 using CloudFlare.Client.Api.Authentication;
+using CloudFlare.Client.Api.Result;
 using CloudFlare.Client.Api.Zones.DnsRecord;
 using CloudFlare.Client.Enumerators;
 using CloudFlareDnsUpdater.Providers;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Net;
+using System.Security.Authentication;
 using System.Text.RegularExpressions;
 
 namespace CloudFlareDnsUpdater.HostedServices;
@@ -82,7 +84,35 @@ internal partial class DnsUpdaterHostedService : IHostedService
 
             foreach (var zone in zones)
             {
-                var records = (await client.Zones.DnsRecords.GetAsync(zone.Id, new DnsRecordFilter {Type = DnsRecordType.A}, null, cancellationToken)).Result;
+                // skip zones that do not match the domain we want to limit to if limiter is set
+                if (!string.IsNullOrWhiteSpace(_limitToZoneByDomain) && !zone.Name.EndsWith(_limitToZoneByDomain))
+                {
+                    _logger.Debug("Skipping zone '{Zone}' because it does not end with '{LimitToZoneByDomain}'", zone.Name, _limitToZoneByDomain);
+
+                    continue;
+                }
+
+                CloudFlareResult<IReadOnlyList<DnsRecord>> recordsResult;
+
+                try
+                {
+                    recordsResult = await client.Zones.DnsRecords.GetAsync(zone.Id, new DnsRecordFilter {Type = DnsRecordType.A}, null, cancellationToken);
+                }
+                catch (AuthenticationException)
+                {
+                    _logger.Warning("Unable to get DNS records for zone '{Zone}', the API token does not have DNS permissions for this zone", zone.Name);
+
+                    continue;
+                }
+
+                if (!recordsResult.Success)
+                {
+                    _logger.Warning("Unable to get DNS records for zone '{Zone}', the API token may not have DNS permissions for this zone: {@Error}", zone.Name, recordsResult.Errors);
+
+                    continue;
+                }
+
+                var records = recordsResult.Result;
 
                 _logger.Debug("Found the following 'A' records in zone '{Zone}': {@Records}", zone.Name, records.Select(x => x.Name));
 
