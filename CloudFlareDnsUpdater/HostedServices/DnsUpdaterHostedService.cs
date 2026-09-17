@@ -30,7 +30,9 @@ internal partial class DnsUpdaterHostedService : IHostedService
 
         _authentication = !string.IsNullOrEmpty(token)
             ? new ApiTokenAuthentication(token)
-            : new ApiKeyAuthentication(email, key);
+            : !string.IsNullOrEmpty(email) && !string.IsNullOrEmpty(key)
+                ? new ApiKeyAuthentication(email, key)
+                : null;
 
         _updateInterval = TimeSpan.FromSeconds(config.GetValue("UpdateIntervalSeconds", 30));
 
@@ -55,6 +57,13 @@ internal partial class DnsUpdaterHostedService : IHostedService
     {
         try
         {
+            if (_authentication is null)
+            {
+                _logger.Error("No CloudFlare credentials configured. Set CloudFlare:ApiToken or CloudFlare:Email and CloudFlare:ApiKey");
+
+                return;
+            }
+
             using var client = new CloudFlareClient(_authentication);
             var externalIpAddress = await GetIpAddressAsync(cancellationToken);
 
