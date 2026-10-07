@@ -17,5 +17,10 @@ services:
       
       - UpdateIntervalSeconds=
       - LimitToZoneByDomain=
+      # Comma-separated record names that must never be updated, e.g. a LAN-only host:
+      #   ExcludeRecords=calitally.example.com,nas.example.com
+      - ExcludeRecords=
+      # Records whose current address is private (10/8, 172.16/12, 192.168/16, ...) are left alone by default.
+      - SkipPrivateIpRecords=true
     restart: unless-stopped
 
