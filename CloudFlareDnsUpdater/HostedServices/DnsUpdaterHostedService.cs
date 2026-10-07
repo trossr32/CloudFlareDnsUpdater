@@ -20,6 +20,8 @@ internal partial class DnsUpdaterHostedService : IHostedService
     private readonly IAuthentication _authentication;
     private readonly TimeSpan _updateInterval;
     private readonly string _limitToZoneByDomain;
+    private readonly HashSet<string> _excludeRecords;
+    private readonly bool _skipPrivateIpRecords;
 
     public DnsUpdaterHostedService(HttpClient httpClient, ILogger logger, IConfiguration config)
     {
@@ -39,6 +41,10 @@ internal partial class DnsUpdaterHostedService : IHostedService
         _updateInterval = TimeSpan.FromSeconds(config.GetValue("UpdateIntervalSeconds", 30));
 
         _limitToZoneByDomain = config.GetValue<string>("LimitToZoneByDomain");
+
+        _excludeRecords = ParseExcludeRecords(config.GetValue<string>("ExcludeRecords"));
+
+        _skipPrivateIpRecords = config.GetValue("SkipPrivateIpRecords", true);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -126,6 +132,22 @@ internal partial class DnsUpdaterHostedService : IHostedService
                         continue;
                     }
 
+                    // skip records explicitly excluded by name, e.g. a LAN-only host that must keep its private address
+                    if (IsExcluded(record.Name))
+                    {
+                        _logger.Information("Skipping record '{Record}' in zone '{Zone}' because it is listed in ExcludeRecords", record.Name, zone.Name);
+
+                        continue;
+                    }
+
+                    // skip records that point at a private address; those are never meant to track the external ip
+                    if (_skipPrivateIpRecords && IsPrivateIp(record.Content))
+                    {
+                        _logger.Information("Skipping record '{Record}' in zone '{Zone}' because it points at the private address '{Content}' (set SkipPrivateIpRecords=false to update it anyway)", record.Name, zone.Name, record.Content);
+
+                        continue;
+                    }
+
                     if (record.Type is not DnsRecordType.A || record.Content == externalIpAddress.ToString())
                     {
                         _logger.Debug("The IP for record '{Record}' in zone '{Zone}' is already '{ExternalIpAddress}'", record.Name, zone.Name, externalIpAddress.ToString());
@@ -184,6 +206,53 @@ internal partial class DnsUpdaterHostedService : IHostedService
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Parses the comma-separated ExcludeRecords setting into a set of normalised record names.
+    /// Entries are trimmed, compared case-insensitively and stripped of a trailing dot, so "Calitally.Example.com." matches "calitally.example.com".
+    /// </summary>
+    internal static HashSet<string> ParseExcludeRecords(string excludeRecords)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(excludeRecords))
+            return set;
+
+        foreach (var entry in excludeRecords.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var name = entry.TrimEnd('.');
+
+            if (name.Length > 0)
+                set.Add(name);
+        }
+
+        return set;
+    }
+
+    /// <summary>
+    /// True when the record name is listed in ExcludeRecords (case-insensitive, ignoring a trailing dot).
+    /// </summary>
+    internal bool IsExcluded(string recordName) =>
+        !string.IsNullOrWhiteSpace(recordName) && _excludeRecords.Contains(recordName.Trim().TrimEnd('.'));
+
+    /// <summary>
+    /// True when the content is an IPv4 address that cannot be reached from the internet:
+    /// RFC 1918 (10/8, 172.16/12, 192.168/16), loopback (127/8), link-local (169.254/16) or carrier-grade NAT (100.64/10).
+    /// </summary>
+    internal static bool IsPrivateIp(string content)
+    {
+        if (!IPAddress.TryParse(content, out var ip) || ip.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            return false;
+
+        var b = ip.GetAddressBytes();
+
+        return b[0] == 10
+            || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+            || (b[0] == 192 && b[1] == 168)
+            || b[0] == 127
+            || (b[0] == 169 && b[1] == 254)
+            || (b[0] == 100 && b[1] >= 64 && b[1] <= 127);
+    }
 
     [GeneratedRegex(@"\t|\n|\r")]
     private static partial Regex UnwantedCharacters();
